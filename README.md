@@ -101,22 +101,3 @@ Edita le sezioni `dd` in `deploy.sh`:
 sudo dd if=/dev/zero of="$APACHE_DOC_ROOT/test-files/xlarge.dat" bs=1024 count=5120
 ```
 
-
-## Troubleshooting
-
-### Errori comuni
-
-**403 Forbidden - Search permission missing:**
-```bash
-# Fix permessi directory
-sudo chmod 755 /var/www/html/test-files/
-sudo systemctl restart apache2
-```
-
-**Modulo alias non trovato:**
-```bash
-# Abilita modulo alias
-sudo a2enmod alias
-sudo systemctl restart apache2
-```
-
