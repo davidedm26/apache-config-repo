@@ -12,6 +12,7 @@ apache-config-repo/
 └── README.md              # Documentazione
 ```
 
+
 ## Endpoints Disponibili
 
 - `/small` - File da ~1KB
@@ -20,57 +21,67 @@ apache-config-repo/
 - `/xlarge` - File da ~1MB
 - `/xxlarge` - File da ~10MB
 
+## Prerequisiti
+
+- **Ubuntu 22.04 LTS**
+
+
+
+## Installazione Apache
+
+### 1. **Aggiorna il sistema**
+```bash
+sudo apt update
+sudo apt upgrade -y
+```
+
+### 2. **Installa Apache 2**
+```bash
+# Installa Apache2 e utilità
+sudo apt install apache2 apache2-utils -y
+```
+
+### 3. **Avvia e configura Apache**
+```bash
+# Avvia Apache
+sudo systemctl start apache2
+
+# Abilita avvio automatico
+sudo systemctl enable apache2
+
+# Verifica status
+sudo systemctl status apache2
+```
+
+### 4. **Configura firewall** (opzionale)
+```bash
+# Se hai ufw attivo
+sudo ufw allow 'Apache'
+
+# Oppure permetti porta 80 direttamente
+sudo ufw allow 80
+```
+
+### 5. **Test installazione**
+```bash
+# Test locale
+curl http://localhost
+
+# Dovrebbe mostrare la pagina di default di Apache
+```
+
 ## Deployment su Ubuntu 22.04 LTS
 
 ```bash
 # Clona la repository
-git clone <repo-url> apache-capacity-test
-cd apache-capacity-test
+git clone https://github.com/davidedm26/apache-config-repo
+cd apache-config-repo
 
-# Esegui deployment (lo script si auto-corregge i permessi)
+# Esegui deployment 
+chmod +x ./deploy.sh
 ./deploy.sh
 ```
 
-**Prerequisiti:**
-- Ubuntu 22.04 LTS
-- Apache2 installato (`sudo apt install apache2`)
-- Accesso sudo
-
-Lo script di deployment:
-- **Auto-fix permessi**: rende se stesso eseguibile automaticamente
-- **Genera file di test**: 5 file di dimensioni diverse (1KB - 10MB)
-- **Configura Apache**: alias per routing semplificato
-- **Fix permessi**: risolve problemi di accesso directory
-- **Test automatico**: verifica che tutti gli endpoint funzionino
-- **Diagnostica avanzata**: suggerisce comandi debug in caso di errori
-
-## Test degli Endpoint
-
-### Dal Server (verifica locale)
-```bash
-# Test manuale con curl
-curl http://localhost/small
-curl http://localhost/medium
-curl http://localhost/large
-curl http://localhost/xlarge  
-curl http://localhost/xxlarge
-
-# Test con timing
-curl -w "Time: %{time_total}s, Size: %{size_download} bytes\n" -o /dev/null -s http://localhost/small
-```
-
-### Dal Client (per capacity testing)
-```bash
-# Sostituisci SERVER_IP con l'IP del tuo server
-curl http://SERVER_IP/small
-curl http://SERVER_IP/medium
-curl http://SERVER_IP/large
-curl http://SERVER_IP/xlarge
-curl http://SERVER_IP/xxlarge
-
-# Server status (per monitoring)
-curl http://SERVER_IP/status
-```
 
 ## Configurazione Apache
 
@@ -80,20 +91,6 @@ La configurazione `minimal.conf` è estremamente semplificata:
 - **Permessi base** per accesso pubblico
 - **Minimo overhead** di processing
 
-## Monitoring
-
-```bash
-# Status Apache real-time
-curl http://localhost/status
-
-# Log Apache in tempo reale
-sudo tail -f /var/log/apache2/access.log
-sudo tail -f /var/log/apache2/error.log
-
-# Risorse sistema
-htop
-sudo systemctl status apache2
-```
 
 ## Personalizzazione
 
@@ -104,10 +101,6 @@ Edita le sezioni `dd` in `deploy.sh`:
 sudo dd if=/dev/zero of="$APACHE_DOC_ROOT/test-files/xlarge.dat" bs=1024 count=5120
 ```
 
-### Aggiungere nuovi endpoint
-1. Genera nuovo file in `deploy.sh`
-2. Aggiungi alias in `config/minimal.conf`
-3. Aggiungi test nel loop di verifica
 
 ## Troubleshooting
 
@@ -145,17 +138,3 @@ sudo a2enmod alias
 sudo systemctl restart apache2
 ```
 
-**ServerName warning:**
-```bash
-# Il deploy.sh risolve automaticamente questo problema
-echo "ServerName localhost" | sudo tee /etc/apache2/conf-available/servername.conf
-sudo a2enconf servername
-```
-
-## Note Importanti
-
-- **Solo per testing**: configurazione minimale, non per produzione
-- **No caching**: ogni richiesta colpisce il server realmente
-- **File binari**: ottimizzati per test di throughput
-- **Auto-diagnostica**: lo script ti guida nella risoluzione problemi
-- **Ubuntu 22.04 LTS**: specificamente testato e ottimizzato
