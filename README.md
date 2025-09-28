@@ -104,24 +104,6 @@ sudo dd if=/dev/zero of="$APACHE_DOC_ROOT/test-files/xlarge.dat" bs=1024 count=5
 
 ## Troubleshooting
 
-### Se deployment fallisce
-
-Il script include diagnostica automatica. In caso di errori:
-
-```bash
-# Controlla log Apache
-sudo tail /var/log/apache2/error.log
-
-# Verifica moduli abilitati  
-sudo apache2ctl -M | grep alias
-
-# Controlla permessi file
-ls -la /var/www/html/test-files/
-
-# Test configurazione Apache
-sudo apache2ctl configtest
-```
-
 ### Errori comuni
 
 **403 Forbidden - Search permission missing:**
