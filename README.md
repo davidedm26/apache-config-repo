@@ -91,6 +91,17 @@ La configurazione `minimal.conf` è estremamente semplificata:
 - **Permessi base** per accesso pubblico
 - **Minimo overhead** di processing
 
+## Monitoraggio Log Live (lato Server)
+
+```bash
+# Comando semplice - mostra tutto in tempo reale
+sudo tail -f /var/log/apache2/access.log /var/log/apache2/error.log
+```
+
+Questo comando mostra sia i **log di accesso** che gli **errori** in tempo reale con etichette per distinguerli:
+- `==> /var/log/apache2/access.log <==` - richieste HTTP  
+- `==> /var/log/apache2/error.log <==` - errori Apache
+
 
 ## Personalizzazione
 
