@@ -8,6 +8,14 @@ set -e
 log() { echo "[INFO] $1"; }
 error() { echo "[ERROR] $1"; exit 1; }
 
+# Make this script executable (self-fix)
+if [ ! -x "$0" ]; then
+    log "Making deploy.sh executable..."
+    chmod +x "$0"
+    log "Script is now executable. Please run it again."
+    exit 0
+fi
+
 # Configuration for Ubuntu 22.04 LTS
 APACHE_CONFIG_DIR="/etc/apache2/conf-available"
 APACHE_DOC_ROOT="/var/www/html"
@@ -42,13 +50,25 @@ log "Created xlarge.dat (1MB)"
 sudo dd if=/dev/zero of="$APACHE_DOC_ROOT/test-files/xxlarge.dat" bs=1024 count=10240 2>/dev/null
 log "Created xxlarge.dat (10MB)"
 
-# Set permissions
+# Set correct permissions for Apache access
+log "Setting correct permissions..."
+# Ensure parent directories have correct permissions
+sudo chmod 755 /var/www/
+sudo chmod 755 "$APACHE_DOC_ROOT"
+sudo chmod 755 "$APACHE_DOC_ROOT/test-files"
+
+# Set ownership and file permissions
 sudo chown -R $APACHE_USER:$APACHE_USER "$APACHE_DOC_ROOT/test-files"
-sudo chmod -R 644 "$APACHE_DOC_ROOT/test-files"
+sudo chmod 644 "$APACHE_DOC_ROOT/test-files"/*
 
 # Install Apache configuration
 log "Installing Apache configuration..."
 sudo cp ./config/minimal.conf "$APACHE_CONFIG_DIR/"
+
+# Fix Apache ServerName warning
+log "Configuring Apache ServerName..."
+echo "ServerName localhost" | sudo tee /etc/apache2/conf-available/servername.conf >/dev/null
+sudo a2enconf servername
 
 # Enable configuration and required modules
 log "Enabling Apache configuration and modules..."
@@ -70,15 +90,43 @@ sudo systemctl restart $APACHE_SERVICE
 
 # Verify deployment
 log "Testing endpoints..."
-sleep 2
+sleep 3
 
-for endpoint in small medium large xlarge xxlarge; do
-    if curl -s -o /dev/null -w "%{http_code}" http://localhost/$endpoint | grep -q "200"; then
-        log "✓ /$endpoint endpoint working"
+# Test direct file access first
+log "Testing direct file access..."
+for file in small medium large xlarge xxlarge; do
+    if curl -s -o /dev/null -w "%{http_code}" http://localhost/test-files/$file.dat | grep -q "200"; then
+        log "✓ Direct access to $file.dat working"
     else
-        error "✗ /$endpoint endpoint failed"
+        log "✗ Direct access to $file.dat failed"
     fi
 done
+
+# Test alias endpoints
+log "Testing alias endpoints..."
+failed_endpoints=()
+
+for endpoint in small medium large xlarge xxlarge; do
+    response_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/$endpoint)
+    if [ "$response_code" = "200" ]; then
+        log "✓ /$endpoint endpoint working (HTTP $response_code)"
+    else
+        log "✗ /$endpoint endpoint failed (HTTP $response_code)"
+        failed_endpoints+=("$endpoint")
+    fi
+done
+
+# Check if any endpoints failed
+if [ ${#failed_endpoints[@]} -gt 0 ]; then
+    log "Failed endpoints: ${failed_endpoints[*]}"
+    log "Debug commands:"
+    log "  sudo tail /var/log/apache2/error.log"
+    log "  sudo apache2ctl -M | grep alias"
+    log "  ls -la /var/www/html/test-files/"
+    error "Some endpoints are not working properly"
+else
+    log "All endpoints working correctly!"
+fi
 
 log "Deployment completed successfully!"
 log ""
