@@ -52,9 +52,10 @@ sudo cp ./config/minimal.conf "$APACHE_CONFIG_DIR/"
 
 # Enable configuration and required modules
 log "Enabling Apache configuration and modules..."
-sudo a2enconf minimal
+sudo a2enmod alias
 sudo a2enmod headers
 sudo a2enmod status
+sudo a2enconf minimal
 
 # Test configuration
 if sudo apache2ctl configtest; then
