@@ -1,16 +1,14 @@
-# Apache Minimal Web Server for JMeter Capacity Testing
+# Apache Minimal Web Server for Capacity Testing
 
-Configurazione minimale di Apache per servire file di diverse dimensioni per capacity testing con JMeter.
+Configurazione minimale di Apache per servire file di diverse dimensioni per capacity testing.
 
 ## Struttura del Progetto
 
 ```
 apache-config-repo/
 ├── config/
-│   └── minimal.conf        # Configurazione Apache ottimizzata
-├── jmeter/
-│   └── capacity-test.jmx   # Piano di test JMeter
-├── deploy.sh              # Script di deployment
+│   └── minimal.conf        # Configurazione Apache minimale
+├── deploy.sh              # Script di deployment automatico
 └── README.md              # Documentazione
 ```
 
@@ -22,29 +20,33 @@ apache-config-repo/
 - `/xlarge` - File da ~1MB
 - `/xxlarge` - File da ~10MB
 
-## Deployment su Server Linux
+## Deployment su Ubuntu 22.04 LTS
 
 ```bash
 # Clona la repository
 git clone <repo-url> apache-capacity-test
 cd apache-capacity-test
 
-# Rendi eseguibile lo script
-chmod +x deploy.sh
-
-# Deploy (richiede sudo)
-sudo ./deploy.sh
+# Esegui deployment (lo script si auto-corregge i permessi)
+./deploy.sh
 ```
 
-Lo script:
-- Rileva automaticamente la distribuzione Linux (Ubuntu/Debian o CentOS/RHEL)
-- Configura Apache con impostazioni ottimizzate per capacity test
-- Genera i file di test di diverse dimensioni
-- Configura le rotte per servire i file
-- Riavvia Apache
+**Prerequisiti:**
+- Ubuntu 22.04 LTS
+- Apache2 installato (`sudo apt install apache2`)
+- Accesso sudo
+
+Lo script di deployment:
+- **Auto-fix permessi**: rende se stesso eseguibile automaticamente
+- **Genera file di test**: 5 file di dimensioni diverse (1KB - 10MB)
+- **Configura Apache**: alias per routing semplificato
+- **Fix permessi**: risolve problemi di accesso directory
+- **Test automatico**: verifica che tutti gli endpoint funzionino
+- **Diagnostica avanzata**: suggerisce comandi debug in caso di errori
 
 ## Test degli Endpoint
 
+### Dal Server (verifica locale)
 ```bash
 # Test manuale con curl
 curl http://localhost/small
@@ -53,115 +55,107 @@ curl http://localhost/large
 curl http://localhost/xlarge  
 curl http://localhost/xxlarge
 
-# Status del server (per monitoring)
-curl http://localhost/status
+# Test con timing
+curl -w "Time: %{time_total}s, Size: %{size_download} bytes\n" -o /dev/null -s http://localhost/small
 ```
 
-## Capacity Testing con JMeter
+### Dal Client (per capacity testing)
+```bash
+# Sostituisci SERVER_IP con l'IP del tuo server
+curl http://SERVER_IP/small
+curl http://SERVER_IP/medium
+curl http://SERVER_IP/large
+curl http://SERVER_IP/xlarge
+curl http://SERVER_IP/xxlarge
 
-### Dal Client (tua macchina)
-
-1. **Interfaccia Grafica:**
-   ```bash
-   jmeter
-   # Apri il file jmeter/capacity-test.jmx
-   # Modifica SERVER variable con l'IP del server
-   # Esegui il test
-   ```
-
-2. **Command Line:**
-   ```bash
-   jmeter -n -t jmeter/capacity-test.jmx -l results.jtl -JSERVER=192.168.1.100
-   ```
-
-3. **Con parametri personalizzati:**
-   ```bash
-   jmeter -n -t jmeter/capacity-test.jmx \
-     -l results.jtl \
-     -JSERVER=192.168.1.100 \
-     -JPORT=80 \
-     -Jthreads=100 \
-     -Jrampup=60
-   ```
-
-### Configurazione Test JMeter
-
-Il piano di test incluso:
-- **50 thread concorrenti** (modificabile)
-- **10 iterazioni** per thread
-- **30 secondi** di ramp-up
-- **Testa tutti e 5 gli endpoint** in modo distribuito
-- **Keep-alive abilitato** per performance realistiche
-- **Salvataggio risultati** in formato JTL
+# Server status (per monitoring)
+curl http://SERVER_IP/status
+```
 
 ## Configurazione Apache
 
-La configurazione `minimal.conf` include:
-- **MPM Event** ottimizzato per alta concorrenza
-- **Keep-alive** configurato per performance
-- **No caching** per test accurati
-- **Server status** per monitoring
-- **Alias semplici** per routing diretto ai file
+La configurazione `minimal.conf` è estremamente semplificata:
+- **Alias diretti** per routing ai file di test
+- **No caching** per test accurati  
+- **Permessi base** per accesso pubblico
+- **Minimo overhead** di processing
 
 ## Monitoring
 
-Durante i test puoi monitorare:
 ```bash
 # Status Apache real-time
-curl http://server-ip/status
+curl http://localhost/status
 
-# Log Apache
-sudo tail -f /var/log/apache2/access.log  # Ubuntu/Debian
-sudo tail -f /var/log/httpd/access_log    # CentOS/RHEL
+# Log Apache in tempo reale
+sudo tail -f /var/log/apache2/access.log
+sudo tail -f /var/log/apache2/error.log
 
 # Risorse sistema
 htop
-iotop
+sudo systemctl status apache2
 ```
 
 ## Personalizzazione
 
 ### Modificare dimensioni file
-Edita `deploy.sh` nella sezione di generazione file per cambiare le dimensioni.
+Edita le sezioni `dd` in `deploy.sh`:
+```bash
+# Esempio: file da 5MB invece di 1MB
+sudo dd if=/dev/zero of="$APACHE_DOC_ROOT/test-files/xlarge.dat" bs=1024 count=5120
+```
 
-### Modificare configurazione Apache
-Edita `config/minimal.conf` per ottimizzazioni specifiche.
-
-### Modificare test JMeter
-Edita `jmeter/capacity-test.jmx` per:
-- Numero di thread
-- Durata test
-- Pattern di carico
-- Endpoint da testare
+### Aggiungere nuovi endpoint
+1. Genera nuovo file in `deploy.sh`
+2. Aggiungi alias in `config/minimal.conf`
+3. Aggiungi test nel loop di verifica
 
 ## Troubleshooting
 
-### Problemi comuni
+### Se deployment fallisce
 
-1. **Permessi negati:**
-   ```bash
-   sudo chown -R www-data:www-data /var/www/html/test-files  # Ubuntu
-   sudo chown -R apache:apache /var/www/html/test-files      # CentOS
-   ```
+Il script include diagnostica automatica. In caso di errori:
 
-2. **Apache non si riavvia:**
-   ```bash
-   sudo apache2ctl configtest  # Testa configurazione
-   sudo systemctl status apache2
-   ```
+```bash
+# Controlla log Apache
+sudo tail /var/log/apache2/error.log
 
-3. **Endpoint non raggiungibili:**
-   ```bash
-   # Verifica file esistano
-   ls -la /var/www/html/test-files/
-   
-   # Verifica configurazione
-   sudo apache2ctl -S
-   ```
+# Verifica moduli abilitati  
+sudo apache2ctl -M | grep alias
 
-## Note
+# Controlla permessi file
+ls -la /var/www/html/test-files/
 
-- Configurazione ottimizzata per testing, non per produzione
-- Disabilita caching per risultati accurati
-- Usa file binari per evitare overhead di processing
-- Include monitoring built-in per analisi real-time
+# Test configurazione Apache
+sudo apache2ctl configtest
+```
+
+### Errori comuni
+
+**403 Forbidden - Search permission missing:**
+```bash
+# Fix permessi directory
+sudo chmod 755 /var/www/html/test-files/
+sudo systemctl restart apache2
+```
+
+**Modulo alias non trovato:**
+```bash
+# Abilita modulo alias
+sudo a2enmod alias
+sudo systemctl restart apache2
+```
+
+**ServerName warning:**
+```bash
+# Il deploy.sh risolve automaticamente questo problema
+echo "ServerName localhost" | sudo tee /etc/apache2/conf-available/servername.conf
+sudo a2enconf servername
+```
+
+## Note Importanti
+
+- **Solo per testing**: configurazione minimale, non per produzione
+- **No caching**: ogni richiesta colpisce il server realmente
+- **File binari**: ottimizzati per test di throughput
+- **Auto-diagnostica**: lo script ti guida nella risoluzione problemi
+- **Ubuntu 22.04 LTS**: specificamente testato e ottimizzato

@@ -8,14 +8,6 @@ set -e
 log() { echo "[INFO] $1"; }
 error() { echo "[ERROR] $1"; exit 1; }
 
-# Make this script executable (self-fix)
-if [ ! -x "$0" ]; then
-    log "Making deploy.sh executable..."
-    chmod +x "$0"
-    log "Script is now executable. Please run it again."
-    exit 0
-fi
-
 # Configuration for Ubuntu 22.04 LTS
 APACHE_CONFIG_DIR="/etc/apache2/conf-available"
 APACHE_DOC_ROOT="/var/www/html"
