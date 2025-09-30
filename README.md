@@ -24,6 +24,7 @@ apache-config-repo/
 ## Prerequisiti
 
 - **Ubuntu 22.04 LTS**
+- Assicurati di aver installato il comando curl
 
 
 

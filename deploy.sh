@@ -121,6 +121,13 @@ else
 fi
 
 log "Deployment completed successfully!"
+
+# Configura script di monitoraggio vmstat
+log ""
+log "Configurando script di monitoraggio vmstat..."
+chmod +x ./vmstat-5min.sh
+
+
 log ""
 log "Test endpoints:"
 log "  http://localhost/small   (1KB)"
@@ -129,5 +136,9 @@ log "  http://localhost/large   (100KB)"
 log "  http://localhost/xlarge  (1MB)"
 log "  http://localhost/xxlarge (10MB)"
 log "  http://localhost/status  (server status)"
+log ""
+log "Monitoraggio performance:"
+log "  ./vmstat-5min.sh        # Raccoglie vmstat per 5 minuti"
+log "  File salvati in: /var/log/apache-performance/"
 log ""
 log "Ready for JMeter capacity testing!"
