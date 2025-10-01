@@ -4,7 +4,7 @@
 # ===========================================
 # CONFIGURAZIONE
 # ===========================================
-DURATION=10800        # Durata in secondi 
+DURATION=11000        # Durata in secondi 
 INTERVAL=2          # Intervallo campionamento in secondi
 OUTPUT_DIR="/var/log/performance"
 OUTPUT_FILE=""
