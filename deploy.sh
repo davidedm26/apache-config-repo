@@ -125,7 +125,7 @@ log "Deployment completed successfully!"
 # Configura script di monitoraggio vmstat
 log ""
 log "Configurando script di monitoraggio vmstat..."
-chmod +x ./vmstat-5min.sh
+chmod +x ./vmstat-monitor.sh
 
 
 log ""

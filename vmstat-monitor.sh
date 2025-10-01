@@ -4,9 +4,10 @@
 # ===========================================
 # CONFIGURAZIONE
 # ===========================================
-DURATION=1080        # Durata in secondi (default: 300 = 5 min)
+DURATION=1000000        # Durata in secondi 
 INTERVAL=2          # Intervallo campionamento in secondi
-APACHE_RESTART_INTERVAL=60  # Riavvio Apache ogni 1 minuto (60s)
+APACHE_RESTART_INTERVAL=360  # Riavvio Apache ogni 6 minuti (360s)
+FIRST_RESTART_DELAY=330      # Primo riavvio dopo 330 secondi (5.5 minuti)
 OUTPUT_DIR="/var/log/performance"
 OUTPUT_FILE=""
 
@@ -18,12 +19,11 @@ show_help() {
     echo "Uso: $0 [DURATA_SECONDI] [FILE_OUTPUT]"
     echo ""
     echo "Parametri:"
-    echo "  DURATA_SECONDI   Durata monitoraggio in secondi (default: 300 = 5 min)"
     echo "  FILE_OUTPUT      Nome file output (default: auto-generato)"
     echo ""
     echo "Funzionalità:"
     echo "  - Monitoraggio vmstat continuo"
-    echo "  - Riavvio Apache ogni 5 minuti automatico"
+    echo "  - Riavvio Apache ogni 6 minuti automatico"
     echo "  - Marker CSV per separare le sessioni"
     echo ""
     echo "Esempi:"
@@ -41,10 +41,12 @@ setup_output() {
     
     # Genera nome file se non specificato
     if [ -z "$OUTPUT_FILE" ]; then
-        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-        OUTPUT_FILE="$OUTPUT_DIR/vmstat_with_restarts_${TIMESTAMP}.csv"
+        START_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        OUTPUT_FILE="$OUTPUT_DIR/vmstat_START_${START_TIMESTAMP}.csv"
     else
-        OUTPUT_FILE="$OUTPUT_DIR/$OUTPUT_FILE"
+        # Se specificato, aggiungi timestamp di inizio
+        START_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        OUTPUT_FILE="$OUTPUT_DIR/${OUTPUT_FILE%.*}_START_${START_TIMESTAMP}.csv"
     fi
 }
 
@@ -106,7 +108,8 @@ echo "   Monitoraggio vmstat + Riavvio Apache -> CSV"
 echo "================================================="
 echo "Durata: $DURATION secondi ($((DURATION/60)) minuti)"
 echo "Intervallo vmstat: $INTERVAL secondi"
-echo "Riavvio Apache ogni: $((APACHE_RESTART_INTERVAL/60)) minuti"
+echo "Primo riavvio Apache dopo: $((FIRST_RESTART_DELAY/60)) minuti ($FIRST_RESTART_DELAY secondi)"
+echo "Riavvii successivi ogni: $((APACHE_RESTART_INTERVAL/60)) minuti ($APACHE_RESTART_INTERVAL secondi)"
 echo "Campioni attesi: $((DURATION/INTERVAL))"
 
 setup_output
@@ -133,6 +136,7 @@ SAMPLES_COLLECTED=0
 SESSION_NUMBER=1
 START_TIME=$(date +%s)
 LAST_APACHE_RESTART=$START_TIME
+FIRST_RESTART_DONE=false
 
 # Funzione cleanup
 cleanup() {
@@ -154,6 +158,15 @@ cleanup() {
 show_results() {
     END_TIME=$(date +%s)
     ACTUAL_DURATION=$((END_TIME - START_TIME))
+    
+    # Genera timestamp di fine
+    END_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+    
+    # Rinomina file con timestamp di fine
+    OLD_FILE="$OUTPUT_FILE"
+    NEW_FILE="${OUTPUT_FILE%.*}_END_${END_TIMESTAMP}.csv"
+    mv "$OLD_FILE" "$NEW_FILE"
+    OUTPUT_FILE="$NEW_FILE"
     
     echo "================================================="
     echo "       Monitoraggio completato"
@@ -190,10 +203,22 @@ collect_vmstat_data() {
         CURRENT_TIME=$(date +%s)
         
         # Controlla se è ora di riavviare Apache
-        if [ $((CURRENT_TIME - LAST_APACHE_RESTART)) -ge $APACHE_RESTART_INTERVAL ]; then
-            SESSION_NUMBER=$((SESSION_NUMBER + 1))
-            restart_apache_and_mark
-            LAST_APACHE_RESTART=$CURRENT_TIME
+        if [ "$FIRST_RESTART_DONE" = false ]; then
+            # Primo restart dopo FIRST_RESTART_DELAY secondi
+            if [ $((CURRENT_TIME - LAST_APACHE_RESTART)) -ge $FIRST_RESTART_DELAY ]; then
+                SESSION_NUMBER=$((SESSION_NUMBER + 1))
+                restart_apache_and_mark
+                LAST_APACHE_RESTART=$CURRENT_TIME
+                FIRST_RESTART_DONE=true
+                echo "   ℹ️ Primo restart completato dopo $FIRST_RESTART_DELAY secondi"
+            fi
+        else
+            # Restart successivi ogni APACHE_RESTART_INTERVAL secondi
+            if [ $((CURRENT_TIME - LAST_APACHE_RESTART)) -ge $APACHE_RESTART_INTERVAL ]; then
+                SESSION_NUMBER=$((SESSION_NUMBER + 1))
+                restart_apache_and_mark
+                LAST_APACHE_RESTART=$CURRENT_TIME
+            fi
         fi
         
         # Skip header lines di vmstat
@@ -219,8 +244,17 @@ collect_vmstat_data() {
             if [ $((SAMPLES_COLLECTED % 15)) -eq 0 ]; then
                 elapsed=$((SAMPLES_COLLECTED * INTERVAL))
                 remaining=$((DURATION - elapsed))
-                time_to_next_restart=$((APACHE_RESTART_INTERVAL - (CURRENT_TIME - LAST_APACHE_RESTART)))
-                echo "[$(date '+%H:%M:%S')] Sessione $SESSION_NUMBER | Progresso: ${elapsed}s/${DURATION}s | Campioni: $SAMPLES_COLLECTED | Prossimo riavvio: ${time_to_next_restart}s"
+                
+                # Calcola tempo al prossimo restart
+                if [ "$FIRST_RESTART_DONE" = false ]; then
+                    time_to_next_restart=$((FIRST_RESTART_DELAY - (CURRENT_TIME - LAST_APACHE_RESTART)))
+                    restart_type="PRIMO"
+                else
+                    time_to_next_restart=$((APACHE_RESTART_INTERVAL - (CURRENT_TIME - LAST_APACHE_RESTART)))
+                    restart_type="NORMALE"
+                fi
+                
+                echo "[$(date '+%H:%M:%S')] Sessione $SESSION_NUMBER | Progresso: ${elapsed}s/${DURATION}s | Campioni: $SAMPLES_COLLECTED | Prossimo restart ($restart_type): ${time_to_next_restart}s"
             fi
         fi
     done
